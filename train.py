@@ -124,7 +124,7 @@ def train(args):
     best_val_loss = np.inf
     best_val_f1 = 0.0
 
-    wandb.init(project="repara_test", entity="remaindere")
+    wandb.init(project="test-project", entity="repara_tmp")
     wandb.config = {
             "seed": args.seed,
             "leanring_rate": args.lr,
