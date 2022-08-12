@@ -3,11 +3,17 @@
     Deep Residual Learning for Image Recognition
     https://arxiv.org/abs/1512.03385v1
 """
+"""efficientnet in pytorch
+[2]https://github.com/lukemelas/EfficientNet-PyTorch
+"""
+"""darknet in pytorch
+[3]https://github.com/developer0hye/PyTorch-Darknet53/blob/master/model.py
+"""
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import efficientnet_pytorch import EfficientNet
 
 class BasicBlock(nn.Module):
     """Basic Block for resnet 18 and resnet 34
@@ -162,176 +168,6 @@ def resnet152(num_classes):
     """
     return ResNet(block=BottleNeck, num_block=[3, 8, 36, 3], num_classes=num_classes)
 
-
-class SimpleCNN(nn.Module):
-    """simple CNN model
-    """
-    def __init__(self, in_channels=1, out_channels=256, num_classes=10):
-        super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
-        self.conv4 = nn.Conv2d(in_channels=128, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
-        self.relu = nn.ReLU()
-        self.flatten = nn.Flatten()
-        self.fc = nn.Linear(out_channels * 1 * 1, num_classes)
-        self.adptavgpool1 = nn.AdaptiveAvgPool2d(14)
-        self.adptavgpool2 = nn.AdaptiveAvgPool2d(7)
-        self.adptavgpool3 = nn.AdaptiveAvgPool2d(3)
-        self.adptavgpool4 = nn.AdaptiveAvgPool2d(1)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.adptavgpool1(x)
-        x = self.conv2(x)
-        x = self.relu(x)
-        x = self.adptavgpool2(x)
-        x = self.conv3(x)
-        x = self.relu(x)
-        x = self.adptavgpool3(x)
-        x = self.conv4(x)
-        x = self.relu(x)
-        x = self.adptavgpool4(x)
-        x = self.flatten(x)
-        # print(x.size())
-        y = self.fc(x)
-        return y
-
-
-"""conv vae in pytorch
-ref :https://github.com/sksq96/pytorch-vae 
-"""
-
-
-class VAE_Flatten(nn.Module):
-    def forward(self, input):
-        return input.view(input.size(0), -1)
-
-
-class VAE_UnFlatten(nn.Module):
-    def forward(self, input, size=512):
-        return input.view(input.size(0), size, 1, 1)
-
-
-# CNN VAE model
-class CNN_VAE(nn.Module):
-    """Conv + VAE.
-    """
-
-    def __init__(self, in_channels=512, h_dim=512, z_dim=32):
-        super(CNN_VAE, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels, 256, kernel_size=3, stride=1),
-            nn.ReLU(),
-            nn.Conv2d(256, 128, kernel_size=3, stride=1),
-            nn.ReLU(),
-            nn.Conv2d(128, 64, kernel_size=3, stride=1),
-            nn.ReLU(),
-            nn.Conv2d(64, 32, kernel_size=2, stride=1),
-            nn.ReLU(),
-            VAE_Flatten(),
-        )
-
-        self.fc1 = nn.Linear(h_dim, z_dim)
-        self.fc2 = nn.Linear(h_dim, z_dim)
-        self.fc3 = nn.Linear(z_dim, h_dim)
-
-        self.decoder = nn.Sequential(
-            VAE_UnFlatten(),
-            nn.ConvTranspose2d(h_dim, 64, kernel_size=5, stride=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 128, kernel_size=5, stride=2),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 256, kernel_size=6, stride=2),
-            nn.ReLU(),
-            nn.ConvTranspose2d(256, in_channels, kernel_size=6, stride=2),
-            nn.Sigmoid(),
-        )
-
-    def reparameterize(self, mu, logvar):
-        std = logvar.mul(0.5).exp_()
-        # return torch.normal(mu, std)
-        esp = torch.randn(*mu.size()).cuda()
-        z = mu + std * esp
-        return z
-
-    def bottleneck(self, h):
-        # print("h before bottleneck", h.size())
-        mu, logvar = self.fc1(h), self.fc2(h)
-        z = self.reparameterize(mu, logvar)
-        return z, mu, logvar
-
-    def encode(self, x):
-        # print("x before encdoer", x.size())
-        h = self.encoder(x)
-        # print("h after encoder", h.size())
-        z, mu, logvar = self.bottleneck(h)
-        return z, mu, logvar
-
-    def decode(self, z):
-        z = self.fc3(z)
-        z = self.decoder(z)
-        return z
-
-    def forward(self, x):
-        z, mu, logvar = self.encode(x)
-        # print("z after encoder", z.size())
-        z = self.decode(z)
-        # print("z after decoder", z.size())
-        return z, mu, logvar
-
-
-# CNN AE model
-class CNN_AE(nn.Module):
-    """MaxPool is added
-    """
-    def __init__(self, in_channels=256):
-        super(CNN_AE, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels, int(in_channels / 2), kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(int(in_channels / 2), int(in_channels / 4), kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(int(in_channels / 4), int(in_channels / 8), kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Sigmoid(),  # is it needed?
-        )
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(int(in_channels / 8), int(in_channels / 4), kernel_size=2, stride=2),
-            nn.ReLU(),
-            nn.ConvTranspose2d(int(in_channels / 4), int(in_channels / 2), kernel_size=2, stride=2),
-            nn.ReLU(),
-            nn.ConvTranspose2d(int(in_channels / 2), in_channels, kernel_size=2, stride=2),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, x):
-        x = self.encoder(x)
-        # print("x after encoder", x.size())
-        y = self.decoder(x)
-        # print("y after decoder", y.size())
-        return y
-
-
-class SimpleNN(nn.Module):  # nn.Linear in_channel -> out_channels(class)
-    """Simple neural net, only one FC layer.
-    """
-
-    def __init__(self, in_channels=64 * 5 * 5, out_channels=10):
-        super(SimpleNN, self).__init__()
-        self.FC = nn.Linear(in_channels, out_channels)
-
-    def forward(self, x):
-        # print("SimpleNN forward, x size:"+str(x.size()))
-        y = self.FC(x)
-        return y
-
-
 class Identity(nn.Module):
     """To remove layers from model, used as dummy
     """
@@ -343,409 +179,89 @@ class Identity(nn.Module):
         return x
 
 
-class VGG16(nn.Module):
-    """VGG16, Linear in_out channel has been modified to train image, sized 128x128
-    """
-
-    def __init__(self):
-        super(VGG16, self).__init__()
-        self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1)
-        self.conv1_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-
-        self.conv2_1 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.conv2_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-
-        self.conv3_1 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1)
-        self.conv3_2 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
-        self.conv3_3 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, padding=1)
-
-        self.conv4_1 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, padding=1)
-        self.conv4_2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
-        self.conv4_3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
-
-        self.conv5_1 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
-        self.conv5_2 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
-        self.conv5_3 = nn.Conv2d(in_channels=512, out_channels=512, kernel_size=3, padding=1)
-
-        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-
-        self.fc1 = nn.Linear(8192, 2048)
-        self.fc2 = nn.Linear(2048, 1024)
-        self.fc3 = nn.Linear(1024, 10)
-
-    def forward(self, x):
-        x = F.relu(self.conv1_1(x))
-        x = F.relu(self.conv1_2(x))
-        x = self.maxpool(x)
-
-        x = F.relu(self.conv2_1(x))
-        x = F.relu(self.conv2_2(x))
-        x = self.maxpool(x)
-
-        x = F.relu(self.conv3_1(x))
-        x = F.relu(self.conv3_2(x))
-        x = F.relu(self.conv3_3(x))
-        x = self.maxpool(x)
-        # print(x.size())
-        x = F.relu(self.conv4_1(x))
-        x = F.relu(self.conv4_2(x))
-        x = F.relu(self.conv4_3(x))
-        x = self.maxpool(x)
-
-        x = F.relu(self.conv5_1(x))
-        x = F.relu(self.conv5_2(x))
-        x = F.relu(self.conv5_3(x))
-        x = self.maxpool(x)
-
-        x = x.view(x.shape[0], -1)
-        # print(x.size())
-
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, 0.5)
-
-        x = F.relu(self.fc2(x))
-        x = F.dropout(x, 0.5)
-
-        y = self.fc3(x)
-        return y
-
-
-class CNN_AE_legacy(nn.Module):
-    """
-    legacy, channel up-scaleing cost is too heavy
-    and it's loss is too high to say model is trained the feature map
-    +inverted bottleneck structure, channel dimension increased(which is exact opposite of original intention)
-    would say that it's garbage model codes,,,
-    """
-
-    def __init__(self, in_channels=256):
-        super(CNN_AE_legacy, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels, 512, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(512, 768, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(768, 1024, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Sigmoid(),
-        )
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(1024, 768, kernel_size=2, stride=2),
-            nn.ReLU(),
-            nn.ConvTranspose2d(768, 512, kernel_size=2, stride=2),
-            nn.ReLU(),
-            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, x):
-        x = self.encoder(x)
-        # print("x after encoder", x.size())
-        y = self.decoder(x)
-        # print("y after decoder", y.size())
-        return y
-    # CNN AE model
-
-
-class CNN_AE_JJinmak(nn.Module):
-    """avgpool precede
-    """
-
-    def __init__(self, in_channels=512):
-        super(CNN_AE_JJinmak, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels, int(in_channels / 2), kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(int(in_channels / 2), int(in_channels / 4), kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(int(in_channels / 4), int(in_channels / 8), kernel_size=4, stride=1),
-            nn.ReLU(),
-        )
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(int(in_channels / 8), int(in_channels / 4), kernel_size=2, stride=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(int(in_channels / 4), int(in_channels / 2), kernel_size=2, stride=1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(int(in_channels / 2), in_channels, kernel_size=2, stride=1),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, x):
-        x = self.encoder(x)
-        # print("x after encoder", x.size())
-        y = self.decoder(x)
-        # print("y after decoder", y.size())
-        return y
-
-class Encoder(nn.Module):    
-    def __init__(self, encoded_space_dim, fc2_input_dim):
-        super().__init__()
-        
-        ### Convolutional section
-        self.encoder_cnn = nn.Sequential(
-            nn.Conv2d(3, 8, 3, stride=2, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(8, 16, 3, stride=2, padding=1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(True),
-            nn.Conv2d(16, 32, 3, stride=2, padding=1),
-            nn.ReLU(True)
-        )
-        ### Flatten layer
-        self.flatten = nn.Flatten(start_dim=1)
-        ### Linear section
-        self.encoder_lin = nn.Sequential(
-            nn.Linear(4 * 4 * 32, 128),
-            nn.ReLU(True),
-            nn.Linear(128, encoded_space_dim)
-        )
+class Efficientnet_B6(nn.Module):
+    def __init__(self, num_classes=num_classes):
+        super(Efficientnet_B6, self).__init__()
+        #self.conv2d = nn.Conv2d(1, 3, 3, stride=1) #if read img as gray scale
+        self.efficientnet = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
         
     def forward(self, x):
-        x = self.encoder_cnn(x)
-        x = self.flatten(x)
-        #print(x.size())
-        x = self.encoder_lin(x)
+        # x = self._swish(self.conv2d(x)) #if read img as gray scale
+        x = self.efficientnet(x)
         return x
 
-class Decoder(nn.Module):
-    def __init__(self, encoded_space_dim, fc2_input_dim):
-        super().__init__()
-        self.decoder_lin = nn.Sequential(
-            nn.Linear(encoded_space_dim, 128),
-            nn.ReLU(True),
-            nn.Linear(128, 32 * 4 * 4),
-            nn.ReLU(True)
-        )
+def efficientnet_b6(num_classes):
+    return Efficientnet_B6(num_classes)
 
-        self.unflatten = nn.Unflatten(dim=1, 
-        unflattened_size=(32, 4, 4))
 
-        self.decoder_conv = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, 4, stride=2, padding=1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(16, 8, 4, stride=2, padding=1),
-            nn.BatchNorm2d(8),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(8, 3, 4, stride=2, padding=1)
-        )
-        
-    def forward(self, x):
-        x = self.decoder_lin(x)
-        x = self.unflatten(x)
-        x = self.decoder_conv(x)
-        x = torch.sigmoid(x)
-        return x
+def conv_batch(in_num, out_num, kernel_size=3, padding=1, stride=1):
+    return nn.Sequential(
+        nn.Conv2d(in_num, out_num, kernel_size=kernel_size, stride=stride, padding=padding, bias=False),
+        nn.BatchNorm2d(out_num),
+        nn.LeakyReLU()
+    )
 
-class conv_ae(nn.Module):
-    def __init__(self, encoded_space_dim, fc2_input_dim):
-        super().__init__()
-        self.encoder = Encoder(encoded_space_dim=encoded_space_dim, fc2_input_dim=fc2_input_dim)
-        self.decoder = Decoder(encoded_space_dim=encoded_space_dim, fc2_input_dim=fc2_input_dim)
+# Residual block
+class DarkResidualBlock(nn.Module):
+    def __init__(self, in_channels):
+        super(DarkResidualBlock, self).__init__()
+
+        reduced_channels = int(in_channels/2)
+
+        self.layer1 = conv_batch(in_channels, reduced_channels, kernel_size=1, padding=0)
+        self.layer2 = conv_batch(reduced_channels, in_channels)
 
     def forward(self, x):
-        x = self.encoder(x)
-        y = self.decoder(x)
-        return y
+        residual = x
 
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out += residual
+        return out
 
+class Darknet53(nn.Module):
+    def __init__(self, block, num_classes):
+        super(Darknet53, self).__init__()
 
-class Encoder_F(nn.Module):    
-    def __init__(self, encoded_space_dim, in_channel):
-        super().__init__()
-        ### Convolutional section
-        in_channel = int(in_channel)
-        self.conv_1 = nn.Sequential(
-            nn.Conv2d(in_channel, in_channel, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel, in_channel, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel, in_channel//2, 1, stride=1),
-            nn.ReLU(True),
-            nn.MaxPool2d(2),
-        )
-        self.conv_2 = nn.Sequential(
-            nn.Conv2d(in_channel//2, in_channel//2, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//2, in_channel//2, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//2, in_channel//4, 1, stride=1),
-            nn.ReLU(True),
-            nn.MaxPool2d(2),
-        )
-        self.conv_3 = nn.Sequential(
-            nn.Conv2d(in_channel//4, in_channel//4, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//4, in_channel//4, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//4, in_channel//8, 1, stride=1),
-            nn.BatchNorm2d(in_channel//8),
-            nn.ReLU(True),
-            nn.MaxPool2d(2),
-        )
-        self.conv_4 = nn.Sequential(
-            nn.Conv2d(in_channel//8, in_channel//8, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//8, in_channel//8, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//8, in_channel//16, 1, stride=1),
-            nn.BatchNorm2d(in_channel//16),
-            nn.ReLU(True),
-        )
-        
-        ### Flatten layer
-        self.flatten = nn.Flatten(start_dim=1)
-        ### Linear section
-        self.encoder_lin = nn.Sequential(
-            nn.Linear(64 * 7 * 7, 1024),
-            nn.ReLU(True),
-            nn.Linear(1024, encoded_space_dim),
-            nn.ReLU(True),
-        )
-        
+        self.num_classes = num_classes
+
+        self.conv1 = conv_batch(3, 32)
+        self.conv2 = conv_batch(32, 64, stride=2)
+        self.residual_block1 = self.make_layer(block, in_channels=64, num_blocks=1)
+        self.conv3 = conv_batch(64, 128, stride=2)
+        self.residual_block2 = self.make_layer(block, in_channels=128, num_blocks=2)
+        self.conv4 = conv_batch(128, 256, stride=2)
+        self.residual_block3 = self.make_layer(block, in_channels=256, num_blocks=8)
+        self.conv5 = conv_batch(256, 512, stride=2)
+        self.residual_block4 = self.make_layer(block, in_channels=512, num_blocks=8)
+        self.conv6 = conv_batch(512, 1024, stride=2)
+        self.residual_block5 = self.make_layer(block, in_channels=1024, num_blocks=4)
+        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(1024, self.num_classes)
+
     def forward(self, x):
-        x = self.conv_1(x)
-        x = self.conv_2(x)
-        x = self.conv_3(x)
-        x = self.conv_4(x)
-        x = self.flatten(x)
-        x = self.encoder_lin(x)
-        return x
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.residual_block1(out)
+        out = self.conv3(out)
+        out = self.residual_block2(out)
+        out = self.conv4(out)
+        out = self.residual_block3(out)
+        out = self.conv5(out)
+        out = self.residual_block4(out)
+        out = self.conv6(out)
+        out = self.residual_block5(out)
+        out = self.global_avg_pool(out)
+        out = out.view(-1, 1024)
+        out = self.fc(out)
 
-class Decoder_F(nn.Module):
-    def __init__(self, encoded_space_dim, in_channel):
-        super().__init__()
-        self.decoder_lin = nn.Sequential(
-            nn.Linear(encoded_space_dim, 1024),
-            nn.ReLU(True),
-            nn.Linear(1024, 64 * 7 * 7),
-            nn.ReLU(True)
-        )
+        return out
 
-        self.unflatten = nn.Unflatten(dim=1, unflattened_size=(64, 7, 7))
-        
-        self.conv_1 = nn.Sequential(
-            nn.Conv2d(in_channel//16, in_channel//8, 1, stride=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//8, in_channel//8, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//8, in_channel//8, 3, stride=1, padding=1),
-            nn.BatchNorm2d(in_channel//8),
-            nn.ReLU(True),
-            nn.Upsample(scale_factor=2, mode='nearest'),
-        )
-        self.conv_2 = nn.Sequential(
-            nn.Conv2d(in_channel//8, in_channel//4, 1, stride=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//4, in_channel//4, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//4, in_channel//4, 3, stride=1, padding=1),
-            nn.BatchNorm2d(in_channel//4),
-            nn.ReLU(True),
-            nn.Upsample(scale_factor=2, mode='nearest'),
-        )
-        self.conv_3 = nn.Sequential(
-            nn.Conv2d(in_channel//4, in_channel//2, 1, stride=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//2, in_channel//2, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel//2, in_channel//2, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Upsample(scale_factor=2, mode='nearest'),
-        )
-        self.conv_4 = nn.Sequential(
-            nn.Conv2d(in_channel//2, in_channel, 1, stride=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel, in_channel, 3, stride=1, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channel, in_channel, 3, stride=1, padding=1),
-        )
-        
-    def forward(self, x):
-        x = self.decoder_lin(x)
-        x = self.unflatten(x)
-        x = self.conv_1(x)
-        x = self.conv_2(x)
-        x = self.conv_3(x)
-        x = self.conv_4(x)
-        x = torch.sigmoid(x)
-        return x
+    def make_layer(self, block, in_channels, num_blocks):
+        layers = []
+        for i in range(0, num_blocks):
+            layers.append(block(in_channels))
+        return nn.Sequential(*layers)
 
-class conv_ae_F(nn.Module):
-    def __init__(self, encoded_space_dim, in_channel):
-        super().__init__()
-        self.encoder = Encoder_F(encoded_space_dim=encoded_space_dim, in_channel=in_channel)
-        self.decoder = Decoder_F(encoded_space_dim=encoded_space_dim, in_channel=in_channel)
-    def forward(self, x):
-        x = self.encoder(x)
-        y = self.decoder(x)
-        return y
-
-
-
-class Encoder_JJJmak(nn.Module):    
-    def __init__(self, encoded_space_dim):
-        super().__init__()
-        ### Convolutional section
-        self.encoder_cnn = nn.Sequential(
-            nn.Conv2d(1024, 128, 5, stride=2, padding=2),
-            nn.ReLU(True),
-            nn.Conv2d(128, 64, 5, stride=2, padding=2),
-            nn.BatchNorm2d(64),
-            nn.ReLU(True),
-        )
-        ### Flatten layer
-        self.flatten = nn.Flatten(start_dim=1)
-        ### Linear section
-        self.encoder_lin = nn.Sequential(
-            nn.Linear(64 * 4 * 4, encoded_space_dim),
-        )
-        
-    def forward(self, x):
-        x = self.encoder_cnn(x)
-        x = self.flatten(x)
-        #print(x.size())
-        x = self.encoder_lin(x)
-        return x
-
-class Decoder_JJJmak(nn.Module):
-    def __init__(self, encoded_space_dim):
-        super().__init__()
-        self.decoder_lin = nn.Sequential(
-            nn.Linear(encoded_space_dim, 64 * 4 * 4),
-            nn.ReLU(True)
-        )
-
-        self.unflatten = nn.Unflatten(dim=1, 
-        unflattened_size=(64, 4, 4))
-
-        self.decoder_conv = nn.Sequential(
-            nn.BatchNorm2d(64),
-            nn.ConvTranspose2d(64, 128, 6, stride=2, padding=2),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(128, 1024, 6, stride=2, padding=2),
-        )
-        
-    def forward(self, x):
-        x = self.decoder_lin(x)
-        x = self.unflatten(x)
-        x = self.decoder_conv(x)
-        x = torch.sigmoid(x)
-        return x
-
-class conv_ae_JJJmak(nn.Module):
-    def __init__(self, encoded_space_dim):
-        super().__init__()
-        self.encoder = Encoder_JJJmak(encoded_space_dim=encoded_space_dim)
-        self.decoder = Decoder_JJJmak(encoded_space_dim=encoded_space_dim)
-        self.relu = nn.ReLU()
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.relu(x)
-        y = self.decoder(x)
-        return y
+def darknet53(num_classes):
+    return Darknet53(DarkResidualBlock, num_classes)
