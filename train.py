@@ -23,6 +23,7 @@ from dataset import DogBirdBaseDataset
 from loss import create_criterion
 import madgrad
 from tqdm import tqdm
+import wandb
 
 def seed_everything(seed: int = 42):
     random.seed(seed)
@@ -123,6 +124,23 @@ def train(args):
     best_val_loss = np.inf
     best_val_f1 = 0.0
 
+    wandb.init(project="repara_test", entity="remaindere")
+    wandb.config = {
+            "seed": args.seed,
+            "leanring_rate": args.lr,
+            "dataset": args.dataset,
+            "resize": args.resize,
+            "batch_size": args.batch_size,
+            "valid_batch_size": args.valid_batch_size,
+            "model": args.model,
+            "optimizer": args.optimizer,
+            "lr": args.lr,
+            "val_ratio": args.val_ratio,
+            "loss": args.criterion,
+            "lr_decay_step": args.lr_decay_step,
+            "gamma": args.gamma
+    }
+
     # -- train starts
     for epoch in tqdm(range(args.epochs)):
         # -- train loop
@@ -162,6 +180,11 @@ def train(args):
                 logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
                 logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
                 logger.add_scalar("Train/f1_score", train_f1, epoch * len(train_loader) + idx)
+                wandb.log({
+                    "Train/loss": train_loss,
+                    "Train/accuracy": train_acc,
+                    "Train/f1_score": train_f1
+                })
                 loss_value = 0
                 matches = 0
 
@@ -198,6 +221,12 @@ def train(args):
             val_acc = np.sum(val_acc_items) / len(val_set)
             val_f1 = np.sum(val_f1_items) / len(val_loader)
 
+            wandb.log({
+                "Val/loss": val_loss,
+                "Val/acc": val_acc,
+                "Val/f1": val_f1,
+            })
+
             best_val_acc = max(best_val_acc, val_acc)
 
             if val_loss < best_val_loss:
@@ -228,10 +257,10 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs to train (default: 10)')
     parser.add_argument('--dataset', required=True, type=str, help='dataset type (DogBirdBaseDataset, DogBaseDataset, BirdBaseDataset, TenClassBaseDataset)')
-    parser.add_argument('--resize', type=tuple_type, default="(224,224)", help='image resize values, (default:"(128,128)")')
+    parser.add_argument('--resize', type=tuple_type, default="(256,256)", help='image resize values, (default:"(128,128)")')
     parser.add_argument('--batch_size', type=int, default=16, help='input batch size for training (default: 16)')
     parser.add_argument('--valid_batch_size', type=int, default=16, help='input batch size for validing (default: 16)')
-    parser.add_argument('--model', type=str, default='resnet50', help='model type (default: resnet50)')
+    parser.add_argument('--model', type=str, default='resnet101', help='model type (default: resnet50)')
     parser.add_argument('--model_load_path', type=str, default=None, help='pretrained model path (default: None)')
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer type (default: Adam)')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate (default: 1e-4)')
