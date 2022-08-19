@@ -56,6 +56,15 @@ def train(args):
         data_dir = "/mnt/ramdisk/bird_dataset/train_val"
     elif args.dataset == "TenClassBaseDataset":
         data_dir = "/mnt/ramdisk/ten_class_dataset/train_val"
+    elif args.dataset == "TenClassBaseDataset_half_1":
+        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val_half_1"
+    elif args.dataset == "TenClassBaseDataset_half_2":
+        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val_half_2"
+
+    if args.dataset == "TenClassBaseDataset_half_1":
+        args.dataset = "TenClassBaseDataset"
+    elif args.dataset == "TenClassBaseDataset_half_2":
+        args.dataset = "TenClassBaseDataset"
 
     # -- settings
     use_cuda = torch.cuda.is_available()
@@ -258,9 +267,9 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs to train (default: 10)')
     parser.add_argument('--dataset', required=True, type=str, help='dataset type (DogBirdBaseDataset, DogBaseDataset, BirdBaseDataset, TenClassBaseDataset)')
     parser.add_argument('--resize', type=tuple_type, default="(256,256)", help='image resize values, (default:"(128,128)")')
-    parser.add_argument('--batch_size', type=int, default=16, help='input batch size for training (default: 16)')
+    parser.add_argument('--batch_size', type=int, default=8, help='input batch size for training (default: 8)')
     parser.add_argument('--valid_batch_size', type=int, default=16, help='input batch size for validing (default: 16)')
-    parser.add_argument('--model', type=str, default='resnet101', help='model type (default: resnet50)')
+    parser.add_argument('--model', type=str, default='resnet101', help='model type (default: resnet101)')
     parser.add_argument('--model_load_path', type=str, default=None, help='pretrained model path (default: None)')
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer type (default: Adam)')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate (default: 1e-4)')

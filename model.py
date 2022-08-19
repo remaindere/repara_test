@@ -13,7 +13,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import efficientnet_pytorch import EfficientNet
+from efficientnet_pytorch import EfficientNet
 
 class BasicBlock(nn.Module):
     """Basic Block for resnet 18 and resnet 34
@@ -83,7 +83,7 @@ class BottleNeck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_block, num_classes=2):
+    def __init__(self, block, num_block, num_classes):
         super().__init__()
         self.num_classes = num_classes
         self.in_channels = 64
@@ -180,7 +180,7 @@ class Identity(nn.Module):
 
 
 class Efficientnet_B6(nn.Module):
-    def __init__(self, num_classes=num_classes):
+    def __init__(self, num_classes):
         super(Efficientnet_B6, self).__init__()
         #self.conv2d = nn.Conv2d(1, 3, 3, stride=1) #if read img as gray scale
         self.efficientnet = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
