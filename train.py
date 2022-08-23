@@ -264,7 +264,7 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
-    parser.add_argument('--epochs', type=int, default=10, help='number of epochs to train (default: 10)')
+    parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train (default: 20)')
     parser.add_argument('--dataset', required=True, type=str, help='dataset type (DogBirdBaseDataset, DogBaseDataset, BirdBaseDataset, TenClassBaseDataset)')
     parser.add_argument('--resize', type=tuple_type, default="(256,256)", help='image resize values, (default:"(128,128)")')
     parser.add_argument('--batch_size', type=int, default=8, help='input batch size for training (default: 8)')

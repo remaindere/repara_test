@@ -183,7 +183,7 @@ class Efficientnet_B6(nn.Module):
     def __init__(self, num_classes):
         super(Efficientnet_B6, self).__init__()
         #self.conv2d = nn.Conv2d(1, 3, 3, stride=1) #if read img as gray scale
-        self.efficientnet = EfficientNet.from_pretrained('efficientnet-b6', num_classes=num_classes)
+        self.efficientnet = EfficientNet.from_name('efficientnet-b6', num_classes=num_classes)
         
     def forward(self, x):
         # x = self._swish(self.conv2d(x)) #if read img as gray scale
