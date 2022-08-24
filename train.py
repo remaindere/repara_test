@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torchvision.models as models
-from torch.optim.lr_scheduler import stepLR, ReduceLROnPLateau, CosineAnnealingWarmRestarts
+from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts
 from torch.utils.data import Subset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
@@ -115,7 +115,7 @@ def train(args):
         lr=args.lr,
     )
     # -- scheduler
-    scheduler = ReduceLROnPLateau(optimizer, 'min')
+    scheduler = ReduceLROnPlateau(optimizer, 'min')
 
     # -- logging
     logger = SummaryWriter(log_dir=args.save_dir)
@@ -139,8 +139,8 @@ def train(args):
             "lr": args.lr,
             #"val_ratio": args.val_ratio,
             "loss": args.criterion,
-            "lr_decay_step": args.lr_decay_step,
-            "gamma": args.gamma
+            #"lr_decay_step": args.lr_decay_step,
+            #"gamma": args.gamma
     }
 
     # -- train starts
@@ -260,8 +260,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train (default: 20)')
     parser.add_argument('--dataset', required=True, type=str, help='dataset type (ten_class_dataset)')
     parser.add_argument('--resize', type=tuple_type, default="(224,224)", help='image resize values, (default:"(224, 224)")')
-    parser.add_argument('--batch_size', type=int, default=16, help='input batch size for training (default: 8)')
-    parser.add_argument('--valid_batch_size', type=int, default=16, help='input batch size for validing (default: 16)')
+    parser.add_argument('--batch_size', type=int, default=12, help='input batch size for training (default: 12)')
+    parser.add_argument('--valid_batch_size', type=int, default=12, help='input batch size for validing (default: 12)')
     parser.add_argument('--model', type=str, default='resnet101', help='model type (default: resnet101)')
     parser.add_argument('--model_load_path', type=str, default=None, help='pretrained model path (default: None)')
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer type (default: Adam)')
