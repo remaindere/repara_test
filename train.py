@@ -12,14 +12,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torchvision.models as models
-from torch.optim.lr_scheduler import StepLR
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch.optim.lr_scheduler import stepLR, ReduceLROnPLateau, CosineAnnealingWarmRestarts
 from torch.utils.data import Subset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
 from sklearn.model_selection import StratifiedKFold
 
-from dataset import DogBirdBaseDataset
 from loss import create_criterion
 import madgrad
 from tqdm import tqdm
@@ -47,24 +45,14 @@ def train(args):
         os.mkdir(args.save_dir)
     if os.path.exists(args.model_dir) is not True:
         os.mkdir(args.model_dir)
-    
-    if args.dataset == "DogBirdBaseDataset" :
-        data_dir = "/mnt/ramdisk/dog_bird_dataset/train_val"
-    elif args.dataset == "DogBaseDataset" :
-        data_dir = "/mnt/ramdisk/dog_dataset/train_val"
-    elif args.dataset == "BirdBaseDataset" :
-        data_dir = "/mnt/ramdisk/bird_dataset/train_val"
-    elif args.dataset == "TenClassBaseDataset":
-        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val"
-    elif args.dataset == "TenClassBaseDataset_half_1":
-        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val_half_1"
-    elif args.dataset == "TenClassBaseDataset_half_2":
-        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val_half_2"
 
-    if args.dataset == "TenClassBaseDataset_half_1":
-        args.dataset = "TenClassBaseDataset"
-    elif args.dataset == "TenClassBaseDataset_half_2":
-        args.dataset = "TenClassBaseDataset"
+    if args.dataset == "ten_class_dataset":
+        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val"
+    elif args.dataset == "ten_class_dataset_half_1":
+        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val_half_1"
+    elif args.dataset == "ten_class_dataset_half_2":
+        data_dir = "/mnt/ramdisk/ten_class_dataset/train_val_half_2"
+    args.dataset = "ten_class_dataset"
 
     # -- settings
     use_cuda = torch.cuda.is_available()
@@ -73,12 +61,17 @@ def train(args):
 
     # -- dataset
     dataset_module = getattr(import_module("dataset"), args.dataset)  # default:
-    dataset = dataset_module(
-        data_dir=data_dir,
+    train_set = dataset_module(
+        data_dir=os.path.join(data_dir, 'train'),
         resize=args.resize,
-        val_ratio=args.val_ratio,
+        val_ratio=0,
     )
-    train_set, val_set = dataset.split_dataset()
+    valid_set = dataset_module(
+        data_dir=os.path.join(data_dir, 'val'),
+        resize=args.resize,
+        val_ratio=0,
+    )
+
     #print(train_set)
     train_loader = DataLoader(
         train_set,
@@ -90,17 +83,17 @@ def train(args):
     )
 
     val_loader = DataLoader(
-        val_set,
+        valid_set,
         batch_size=args.valid_batch_size,
         num_workers=4,
-        shuffle=False,
+        shuffle=True,
         pin_memory=use_cuda,
         drop_last=True,
     )
     # -- model
     model_module = getattr(import_module("model"), args.model)  # default: resnet50
     model = model_module(
-        num_classes=dataset.num_classes,
+        num_classes=train_set.num_classes,
     ).to(device)
     #print(model)
     
@@ -122,7 +115,7 @@ def train(args):
         lr=args.lr,
     )
     # -- scheduler
-    scheduler = StepLR(optimizer, args.lr_decay_step, gamma=args.gamma)
+    scheduler = ReduceLROnPLateau(optimizer, 'min')
 
     # -- logging
     logger = SummaryWriter(log_dir=args.save_dir)
@@ -136,7 +129,7 @@ def train(args):
     wandb.init(project="test-project", entity="repara_tmp")
     wandb.config = {
             "seed": args.seed,
-            "leanring_rate": args.lr,
+            "learning_rate": args.lr,
             "dataset": args.dataset,
             "resize": args.resize,
             "batch_size": args.batch_size,
@@ -144,7 +137,7 @@ def train(args):
             "model": args.model,
             "optimizer": args.optimizer,
             "lr": args.lr,
-            "val_ratio": args.val_ratio,
+            #"val_ratio": args.val_ratio,
             "loss": args.criterion,
             "lr_decay_step": args.lr_decay_step,
             "gamma": args.gamma
@@ -197,8 +190,6 @@ def train(args):
                 loss_value = 0
                 matches = 0
 
-        scheduler.step() #lr scheduler
-
         # -- val loop
         with torch.no_grad():
             print("Calculating validation results...")
@@ -247,7 +238,9 @@ def train(args):
                 torch.save(model.state_dict(), f"{args.model_dir}/{args.model}_epoch{epoch+1}_f1_{val_f1}.pth")
                 
                 best_val_f1 = val_f1
-            
+
+            scheduler.step(val_loss)  # lr scheduler
+
             print(f"[Val] loss: {val_loss:4.4}, F1_score {val_f1:4.4}, acc : {val_acc:4.4}% || "f"best loss: {best_val_loss:4.4}, best_F1_score {best_val_f1:4.4} , best acc : {best_val_acc:4.4}% ")
             logger.add_scalar("Val/loss", val_loss, epoch)
             logger.add_scalar("Val/accuracy", val_acc, epoch)
@@ -265,19 +258,19 @@ if __name__ == '__main__':
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
     parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train (default: 20)')
-    parser.add_argument('--dataset', required=True, type=str, help='dataset type (DogBirdBaseDataset, DogBaseDataset, BirdBaseDataset, TenClassBaseDataset)')
-    parser.add_argument('--resize', type=tuple_type, default="(256,256)", help='image resize values, (default:"(128,128)")')
-    parser.add_argument('--batch_size', type=int, default=8, help='input batch size for training (default: 8)')
+    parser.add_argument('--dataset', required=True, type=str, help='dataset type (ten_class_dataset)')
+    parser.add_argument('--resize', type=tuple_type, default="(224,224)", help='image resize values, (default:"(224, 224)")')
+    parser.add_argument('--batch_size', type=int, default=16, help='input batch size for training (default: 8)')
     parser.add_argument('--valid_batch_size', type=int, default=16, help='input batch size for validing (default: 16)')
     parser.add_argument('--model', type=str, default='resnet101', help='model type (default: resnet101)')
     parser.add_argument('--model_load_path', type=str, default=None, help='pretrained model path (default: None)')
     parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer type (default: Adam)')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate (default: 1e-4)')
-    parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
     parser.add_argument('--criterion', type=str, default='cross_entropy', help='criterion type (default: cross_entropy)')
-    parser.add_argument('--lr_decay_step', type=int, default=2, help='learning rate scheduler(stepLR) deacy step (default: 2)')
-    parser.add_argument('--gamma', type=float, default=0.75, help='learning rate scheduler(stepLR) gamma (default: 0.75)')
     parser.add_argument('--log_interval', type=int, default=16, help='how many batches to wait before logging training status')
+    # parser.add_argument('--lr_decay_step', type=int, default=2, help='learning rate scheduler(stepLR) deacy step (default: 2)')
+    # parser.add_argument('--gamma', type=float, default=0.75, help='learning rate scheduler(stepLR) gamma (default: 0.75)')
+    # parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)') #valid set has been hold
 
     # Container environment
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', '../trained_models'))
