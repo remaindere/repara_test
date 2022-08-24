@@ -115,7 +115,7 @@ def train(args):
         lr=args.lr,
     )
     # -- scheduler
-    scheduler = ReduceLROnPlateau(optimizer, 'min')
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
 
     # -- logging
     logger = SummaryWriter(log_dir=args.save_dir)
@@ -218,7 +218,7 @@ def train(args):
                 val_f1_items.append(f1_item)
 
             val_loss = np.sum(val_loss_items) / len(val_loader)
-            val_acc = np.sum(val_acc_items) / len(val_set)
+            val_acc = np.sum(val_acc_items) / len(valid_set)
             val_f1 = np.sum(val_f1_items) / len(val_loader)
 
             wandb.log({
