@@ -45,7 +45,7 @@ def train(args):
         os.mkdir(args.save_dir)
     if os.path.exists(args.model_dir) is not True:
         os.mkdir(args.model_dir)
-
+    
     if args.dataset == "ten_class_dataset":
         data_dir = "/mnt/ramdisk/ten_class_dataset/train_val"
     elif args.dataset == "ten_class_dataset_half_1":
@@ -58,7 +58,7 @@ def train(args):
     use_cuda = torch.cuda.is_available()
     print("USE CUDA> ", use_cuda)
     device = torch.device("cuda" if use_cuda else "cpu")
-
+    
     # -- dataset
     dataset_module = getattr(import_module("dataset"), args.dataset)  # default:
     train_set = dataset_module(
@@ -115,7 +115,7 @@ def train(args):
         lr=args.lr,
     )
     # -- scheduler
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
     # -- logging
     logger = SummaryWriter(log_dir=args.save_dir)
@@ -257,7 +257,7 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
-    parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train (default: 20)')
+    parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train (default: 40)')
     parser.add_argument('--dataset', required=True, type=str, help='dataset type (ten_class_dataset)')
     parser.add_argument('--resize', type=tuple_type, default="(224,224)", help='image resize values, (default:"(224, 224)")')
     parser.add_argument('--batch_size', type=int, default=12, help='input batch size for training (default: 12)')
